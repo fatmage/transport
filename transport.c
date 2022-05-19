@@ -1,8 +1,35 @@
 #include "transport.h"
 
 
-int main(int argc, char **argv) {
+int main() {
 
+
+
+    // na potrzeby vs code
+
+        int sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sockfd < 0) {
+        fprintf(stderr, "socket error: [%s]\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+        uint32_t serverip;
+    if (inet_pton(AF_INET,"127.0.0.1",&serverip) < 0) {
+        fprintf(stderr, "inet_pton error: [%s]\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    uint32_t serverport = htons(2137);
+
+    struct sockaddr_in serveraddr;
+    memset(&serveraddr,0,sizeof(serveraddr));
+    serveraddr.sin_family = AF_INET;
+    serveraddr.sin_addr.s_addr = serverip;
+    serveraddr.sin_port = serverport;
+   
+
+    FILE *file_to_get = fopen("test.txt","a");
+    size_t file_size = 9000150;
+    /*
     if (argc != 5) {
         fprintf(stderr, "Wrong number of arguments! Usage : ./transport [server_ip_address] [port] [file_name] [file_size]\n");
         exit(EXIT_FAILURE);
@@ -27,15 +54,11 @@ int main(int argc, char **argv) {
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_addr.s_addr = serverip;
     serveraddr.sin_port = serverport;
-
-
-    if (bind(sockfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
-        fprintf(stderr, "bind error: [%s]\n", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
+   
 
     FILE *file_to_get = fopen(argv[3],"a");
     size_t file_size = atoi(argv[4]);
+    */
 
     chunk_t chunks[CHUNK_LIMIT] = {};
     byte file_data[CHUNK_LIMIT*CHUNK_SIZE] = {};
@@ -65,21 +88,26 @@ int main(int argc, char **argv) {
     while (received_size < file_size) {
 
         // sendujemy zapytanie o te ktorych jeszcze nie mamy
-        for (unsigned int i = 0; i < current_chunks; i++) {
-            if (!chunks[i].received) {
+        uint32_t queries = 0;
+        for (unsigned int i = 0; i < current_chunks && queries < PACK_SIZE; i++) {
+            if (chunks[i].received == PENDING) {
                 char msg[200] = {};
                 sprintf(msg, "GET %d %d\n", START(received_size,i), chunks[i].size);
                 uint16_t msgsize = strlen(msg);
 
                 for (unsigned int i = 0; i < REPEATS; i++)
                     sendto(sockfd, msg, msgsize, 0, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
+
+                queries++;
+                    
             }
+
         }
 
         // odbieramy
         struct timeval tv;
-        tv.tv_sec = 1;
-        tv.tv_usec = 500;
+        tv.tv_sec = 0;
+        tv.tv_usec = 500000;
 
         fd_set dsc;
         FD_ZERO(&dsc);
@@ -120,7 +148,13 @@ int main(int argc, char **argv) {
 
             offset = atoi((char*)data+5);
             data_size = atoi((char*)data+5+(uint32_t)floor(log10((double)offset))+1);
-            memcpy(data+offset-received_size,data+datastart,data_size);
+
+            if (offset < received_size)
+                continue;
+            if (chunks[INDEX(offset, received_size, CHUNK_SIZE)].received == RECEIVED)
+                continue;
+
+            memcpy(file_data+offset-received_size,data+datastart+1,data_size);
 
             // oznaczyc ze wczytane
             chunks[INDEX(offset, received_size, CHUNK_SIZE)].received = RECEIVED;
@@ -182,10 +216,14 @@ int main(int argc, char **argv) {
 
         }
 
-        
+        // printujemy postep
+
+        printf("%f%% done\n", (float)received_size/file_size);
     }
 
 
+    fflush(sockfd);
+    fclose(sockfd);
     fclose(file_to_get);
 
     return EXIT_SUCCESS;

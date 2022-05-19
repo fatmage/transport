@@ -15,9 +15,10 @@ typedef char byte;
 
 
 
-#define CHUNK_SIZE 800
-#define CHUNK_LIMIT 300
-#define REPEATS 1
+#define CHUNK_SIZE 700
+#define CHUNK_LIMIT 3000
+#define PACK_SIZE 500
+#define REPEATS 3
 
 
 #define PENDING 0
