@@ -9,15 +9,16 @@
 #include <errno.h>
 #include <string.h>
 #include <math.h>
+#include <unistd.h>
 
 
 typedef char byte;
 
 
 
-#define CHUNK_SIZE 700
-#define CHUNK_LIMIT 3000
-#define PACK_SIZE 500
+#define CHUNK_SIZE 1000
+#define CHUNK_LIMIT 2200
+#define PACK_SIZE 600
 #define REPEATS 3
 
 
